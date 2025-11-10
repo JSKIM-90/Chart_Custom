@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart Custom - | �]</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: "=�";
+            font-size: 1.2em;
+        }
+
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .file-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .file-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .file-card a {
+            text-decoration: none;
+            color: #495057;
+            display: block;
+        }
+
+        .file-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .image-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .image-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            border-color: #764ba2;
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+            cursor: pointer;
+        }
+
+        .image-card .image-name {
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            color: #495057;
+            background: white;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #bbb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>=� Chart Custom</h1>
+            <p class="subtitle">\� | �</p>
+        </header>
+
+        <div class="content">
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-number">12</div>
+                    <div class="stat-label">Canvas HTML |</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">60</div>
+                    <div class="stat-label">Jennifer Frame t��</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">�T</div>
+                </div>
+            </div>
+
+            <!-- Canvas HTML Files Section -->
+            <div class="section">
+                <h2 class="section-title">Canvas Sample Files</h2>
+                <div class="file-grid">
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas2.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas2.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas3.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas3.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas4.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas4.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas5.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas5.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas6.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas6.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas7.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas7.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas8.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas8.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas9.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas9.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas10.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas10.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas11.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas11.html</div>
+                        </a>
+                    </div>
+                    <div class="file-card">
+                        <a href="Canvas/Sample/canvas12.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas12.html</div>
+                        </a>
+                    </div>
+                        <div class="file-card">
+                        <a href="Canvas/Sample/canvas13.html" target="_blank">
+                            <div class="file-icon"><�</div>
+                            <div class="file-name">canvas12.html</div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Jennifer Frame Images Section -->
+            <div class="section">
+                <h2 class="section-title">Jennifer Frame Images</h2>
+                <div class="image-grid" id="imageGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Image Preview -->
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <script>
+        // Generate Jennifer Frame images dynamically
+        const imageGrid = document.getElementById('imageGrid');
+        for (let i = 1; i <= 60; i++) {
+            const imageCard = document.createElement('div');
+            imageCard.className = 'image-card';
+            imageCard.innerHTML = `
+                <img src="Jennifer_Frame/${i}.png" alt="Frame ${i}" onclick="openModal(this.src)">
+                <div class="image-name">${i}.png</div>
+            `;
+            imageGrid.appendChild(imageCard);
+        }
+
+        // Modal functionality
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImage');
+        const closeBtn = document.querySelector('.close');
+
+        function openModal(src) {
+            modal.style.display = 'block';
+            modalImg.src = src;
+        }
+
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        modal.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Close modal with ESC key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                modal.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

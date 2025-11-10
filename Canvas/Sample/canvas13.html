@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Tunnel Stream - Burst Mode</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0a0a15;
+            font-family: monospace;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 400px;
+        }
+        .control-item {
+            margin: 8px 0;
+        }
+        label {
+            display: inline-block;
+            width: 180px;
+        }
+        input[type="range"] {
+            width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <div class="control-item">
+            <label>Particles Per Burst:</label>
+            <input type="range" id="burstSize" min="50" max="500" value="150" step="10">
+            <span id="burstSizeValue">150</span>
+        </div>
+        <div class="control-item">
+            <label>Burst Interval (ms):</label>
+            <input type="range" id="burstInterval" min="50" max="1500" value="200" step="50">
+            <span id="burstIntervalValue">200</span>
+        </div>
+        <div class="control-item">
+            <label>Spring Frequency:</label>
+            <input type="range" id="springFreq" min="0.2" max="2.0" value="0.8" step="0.1">
+            <span id="springFreqValue">0.8</span>
+        </div>
+        <div class="control-item">
+            <label>Spring Amplitude:</label>
+            <input type="range" id="springAmp" min="0.0" max="1.0" value="0.4" step="0.05">
+            <span id="springAmpValue">0.4</span>
+        </div>
+        <div class="control-item">
+            <label>Stream Width:</label>
+            <input type="range" id="streamWidth" min="0.02" max="0.15" value="0.06" step="0.01">
+            <span id="streamWidthValue">0.06</span>
+        </div>
+        <div class="control-item">
+            <label>Tunnel Base Length:</label>
+            <input type="range" id="tunnelLength" min="0.1" max="0.4" value="0.2" step="0.01">
+            <span id="tunnelLengthValue">0.2</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let particles = [];
+        let burstSize = 150;
+        let burstInterval = 200; // ms
+        let lastBurstTime = 0;
+        let springFreq = 0.8;
+        let springAmp = 0.4;
+        let streamWidth = 0.06;
+        let tunnelBaseLength = 0.2;
+        let time = 0;
+        let dynamicTunnelLength = 0.2; // 동적 터널 길이
+
+        const tunnelEntranceX = 0.3;
+        const centerY = 0.5;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function getTunnelLength() {
+            // 용수철 효과 적용
+            return dynamicTunnelLength * (1 + Math.sin(time * springFreq * Math.PI * 2) * springAmp);
+        }
+
+        function updateTunnelLength() {
+            // 터널 내 파티클 수 계산
+            let particlesInTunnel = 0;
+            for (let particle of particles) {
+                if (particle.active && particle.isInTunnel()) {
+                    particlesInTunnel++;
+                }
+            }
+
+            // 목표 길이 계산 (파티클 수에 비례)
+            const minLength = tunnelBaseLength * 0.5;
+            const maxLength = tunnelBaseLength * 1.5;
+            const targetLength = minLength + (particlesInTunnel / burstSize) * (maxLength - minLength);
+
+            // 부드럽게 전환
+            dynamicTunnelLength += (targetLength - dynamicTunnelLength) * 0.05;
+        }
+
+        class Particle {
+            constructor() {
+                this.active = false;
+                this.x = -0.05;
+                this.y = centerY + (Math.random() - 0.5) * streamWidth;
+                this.vx = 0.4 + Math.random() * 0.2;
+                this.vy = (Math.random() - 0.5) * 0.02;
+                this.size = 2 + Math.random() * 2;
+                this.alpha = 0.7 + Math.random() * 0.3;
+            }
+
+            activate() {
+                this.active = true;
+                this.x = -0.05;
+                this.y = centerY + (Math.random() - 0.5) * streamWidth;
+                this.vx = 0.4 + Math.random() * 0.2;
+                this.vy = (Math.random() - 0.5) * 0.02;
+                this.size = 2 + Math.random() * 2;
+                this.alpha = 0.7 + Math.random() * 0.3;
+            }
+
+            update(dt) {
+                if (!this.active) return;
+
+                const tunnelLength = getTunnelLength();
+                const tunnelExitX = tunnelEntranceX + tunnelLength;
+                const collisionZone = tunnelEntranceX - 0.05; // 충돌 지점을 터널 입구 왼쪽으로
+
+                // 충돌 지점으로 수렴
+                if (this.x < collisionZone && this.x > collisionZone - 0.15) {
+                    const dyToCenter = centerY - this.y;
+                    this.vy += dyToCenter * 0.12;
+                }
+
+                // 충돌 지점에서 폭죽 효과
+                if (this.x >= collisionZone - 0.02 && this.x < collisionZone + 0.02) {
+                    this.vx *= 0.85;
+                    // 폭죽처럼 사방으로 튀기
+                    const explosionForce = 0.15;
+                    this.vy += (Math.random() - 0.5) * explosionForce;
+                    
+                    // Y 위치를 입구 크기 범위 내로
+                    const distFromCenter = Math.abs(this.y - centerY);
+                    if (distFromCenter > streamWidth * 0.8) {
+                        this.y = centerY + Math.sign(this.y - centerY) * streamWidth * 0.8;
+                        this.vy *= -0.3; // 경계에서 반사
+                    }
+                }
+
+                // 충돌 지점 통과 후 터널 입구까지 다시 중앙으로 수렴
+                if (this.x >= collisionZone && this.x < tunnelEntranceX) {
+                    this.vx *= 1.02;
+                    const dyToCenter = centerY - this.y;
+                    this.vy += dyToCenter * 0.15; // 다시 중앙으로
+                }
+
+                // 터널 출구에서 발사 (터널 내부에서)
+                if (this.x >= tunnelExitX - 0.02 && this.x < tunnelExitX + 0.02) {
+                    // Y 위치를 출구 크기로 제한
+                    const distFromCenter = Math.abs(this.y - centerY);
+                    if (distFromCenter > streamWidth * 0.5) {
+                        this.y = centerY + Math.sign(this.y - centerY) * streamWidth * 0.5;
+                    }
+                    this.vx *= 1.3;
+                    this.vy *= 0.3;
+                }
+
+                this.vx *= 0.998;
+                this.vy *= 0.98;
+
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+
+                if (this.x > 1.2 || this.y < -0.1 || this.y > 1.1) {
+                    this.active = false;
+                }
+            }
+
+            isInTunnel() {
+                const tunnelLength = getTunnelLength();
+                const tunnelExitX = tunnelEntranceX + tunnelLength;
+                return this.x >= tunnelEntranceX && this.x <= tunnelExitX;
+            }
+
+            draw() {
+                if (!this.active || this.isInTunnel()) return;
+
+                const screenX = this.x * width;
+                const screenY = this.y * height;
+                
+                const rectWidth = this.size * 3;
+                const rectHeight = this.size * 1.5;
+                
+                const gradient = ctx.createLinearGradient(
+                    screenX - rectWidth / 2, screenY, 
+                    screenX + rectWidth / 2, screenY
+                );
+                gradient.addColorStop(0, 'rgba(100, 150, 255, 0)');
+                gradient.addColorStop(0.5, 'rgba(100, 150, 255, ' + this.alpha + ')');
+                gradient.addColorStop(1, 'rgba(100, 150, 255, 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(
+                    screenX - rectWidth / 2, 
+                    screenY - rectHeight / 2, 
+                    rectWidth, 
+                    rectHeight
+                );
+            }
+        }
+
+        function drawTunnel() {
+            const tunnelLength = getTunnelLength();
+            const entranceX = tunnelEntranceX * width;
+            const exitX = (tunnelEntranceX + tunnelLength) * width;
+            const cy = centerY * height;
+            const baseRadius = streamWidth * height * 0.6;
+
+            // X축을 따라 원형 고리들을 그림
+            const numRings = Math.floor((exitX - entranceX) / 8); // 8px 간격
+            
+            for (let i = 0; i <= numRings; i++) {
+                const t = i / numRings;
+                const x = entranceX + (exitX - entranceX) * t;
+                
+                // 중앙부가 약간 더 크게
+                const radiusMultiplier = 1 + Math.sin(t * Math.PI) * 0.2;
+                const radius = baseRadius * radiusMultiplier;
+                
+                // 투명도는 중앙이 진하게
+                const alpha = 0.3 + Math.sin(t * Math.PI) * 0.4;
+                
+                ctx.fillStyle = 'rgba(100, 150, 255, ' + alpha + ')';
+                ctx.strokeStyle = 'rgba(70, 120, 220, ' + (alpha * 0.5) + ')';
+                ctx.lineWidth = 1;
+                
+                ctx.beginPath();
+                ctx.arc(x, cy, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            // 충분한 풀 생성 (최대 3000개)
+            for (let i = 0; i < 3000; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function fireBurst(now) {
+            let activated = 0;
+            for (let particle of particles) {
+                if (!particle.active && activated < burstSize) {
+                    particle.activate();
+                    activated++;
+                }
+            }
+        }
+
+        let lastTime = Date.now();
+
+        function animate() {
+            const now = Date.now();
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            time += dt;
+
+            // Burst 발사 체크
+            if (now - lastBurstTime >= burstInterval) {
+                fireBurst(now);
+                lastBurstTime = now;
+            }
+
+            ctx.fillStyle = 'rgba(10, 10, 21, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            // 터널 길이 업데이트
+            updateTunnelLength();
+
+            for (let particle of particles) {
+                particle.update(dt);
+            }
+
+            drawTunnel();
+
+            for (let particle of particles) {
+                particle.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        document.getElementById('burstSize').addEventListener('input', function(e) {
+            burstSize = parseInt(e.target.value);
+            document.getElementById('burstSizeValue').textContent = burstSize;
+        });
+
+        document.getElementById('burstInterval').addEventListener('input', function(e) {
+            burstInterval = parseInt(e.target.value);
+            document.getElementById('burstIntervalValue').textContent = burstInterval;
+        });
+
+        document.getElementById('springFreq').addEventListener('input', function(e) {
+            springFreq = parseFloat(e.target.value);
+            document.getElementById('springFreqValue').textContent = springFreq.toFixed(1);
+        });
+
+        document.getElementById('springAmp').addEventListener('input', function(e) {
+            springAmp = parseFloat(e.target.value);
+            document.getElementById('springAmpValue').textContent = springAmp.toFixed(2);
+        });
+
+        document.getElementById('streamWidth').addEventListener('input', function(e) {
+            streamWidth = parseFloat(e.target.value);
+            document.getElementById('streamWidthValue').textContent = streamWidth.toFixed(2);
+        });
+
+        document.getElementById('tunnelLength').addEventListener('input', function(e) {
+            tunnelBaseLength = parseFloat(e.target.value);
+            document.getElementById('tunnelLengthValue').textContent = tunnelBaseLength.toFixed(2);
+        });
+
+        window.addEventListener('resize', resize);
+
+        resize();
+        initParticles();
+        animate();
+    </script>
+</body>
+</html>
