@@ -45,7 +45,7 @@
         <div class="control-item">
             <label>Particles Per Burst:</label>
             <input type="range" id="burstSize" min="50" max="500" value="500" step="10">
-            <span id="burstSizeValue">150</span>
+            <span id="burstSizeValue">500</span>
         </div>
         <div class="control-item">
             <label>Burst Interval (ms):</label>
@@ -65,12 +65,12 @@
         <div class="control-item">
             <label>Stream Width:</label>
             <input type="range" id="streamWidth" min="0.02" max="0.15" value="0.03" step="0.01">
-            <span id="streamWidthValue">0.06</span>
+            <span id="streamWidthValue">0.03</span>
         </div>
         <div class="control-item">
             <label>Tunnel Base Length:</label>
             <input type="range" id="tunnelLength" min="0.1" max="0.4" value="0.1" step="0.01">
-            <span id="tunnelLengthValue">0.2</span>
+            <span id="tunnelLengthValue">0.1</span>
         </div>
     </div>
 
@@ -80,13 +80,13 @@
 
         let width, height;
         let particles = [];
-        let burstSize = 150;
+        let burstSize = 500;
         let burstInterval = 200; // ms
         let lastBurstTime = 0;
         let springFreq = 0.8;
         let springAmp = 0.4;
-        let streamWidth = 0.06;
-        let tunnelBaseLength = 0.2;
+        let streamWidth = 0.03;
+        let tunnelBaseLength = 0.1;
         let time = 0;
         let dynamicTunnelLength = 0.2; // 동적 터널 길이
 
