@@ -486,6 +486,137 @@ MVP까지 (+2주):
 **점수**: 7.5/10 (Good - 우수한 프로토타입)  
 **투자 대비 효과**: 매우 높음 (3일 → 포트폴리오급 결과물)
 
+
+파라미터 간단 정리
+Particles Per Burst: 160
+한 번에 발사되는 파티클 개수
+
+160개씩 발사
+많을수록 → 유입량 증가 → 큐 쌓임
+
+
+Burst Interval (ms): 1500
+발사 주기
+
+1.5초마다 한 번씩 발사
+짧을수록 → 자주 발사 → 유입량 증가
+
+
+Processing Time (ms): 100
+큐에서 처리하는 시간
+
+파티클이 터널(큐)에 머무는 시간
+길면 → 천천히 배출 → 큐 쌓임 → 터널 길어짐
+짧으면 → 빨리 배출 → 큐 비움 → 터널 짧아짐
+
+
+Spring Frequency: 1.9
+터널 진동 속도
+
+1.9Hz = 초당 1.9번 팽창/수축
+높을수록 → 빠른 진동
+
+
+Spring Amplitude
+터널 진동 크기
+
+터널 길이가 얼마나 크게 변하는지
+0.0 = 진동 없음
+1.0 = 기본 길이의 ±100% 변화
+
+
+요약
+유입: Burst Size × (1000 / Burst Interval)
+     = 160 × (1000 / 1500) 
+     = 초당 약 107개
+
+배출: 터널에 있는 파티클들이 100ms 후 배출
+
+→ 유입 > 배출 → 큐 쌓임 → 터널 길어짐재시도코드를 실행하려면 설정 > 기능에서 코드 실행 및 파일 생성을 활성화하세요.J진동속도와 진동 크기가 의미하는바가 뭐지?사고 과정사용자가 Spring Frequency(진동 속도)와 Spring Amplitude(진동 크기)가 실제로 무엇을 의미하는지 궁금해하고 있다.
+코드를 보면:
+javascriptfunction getTunnelLength() {
+    return dynamicTunnelLength * (1 + Math.sin(time * springFreq * Math.PI * 2) * springAmp);
+}
+이것은 터널 길이를 사인파로 변화시키는 것이다.
+
+dynamicTunnelLength: 기본 터널 길이 (큐 크기에 따라 결정)
+Math.sin(time * springFreq * Math.PI * 2): 시간에 따른 사인파
+springAmp: 진폭 (얼마나 크게 변하는지)
+
+실제 의미:
+
+이것은 시각적 효과일 뿐
+실제 큐 동작과는 무관
+터널이 호흡하듯 늘었다 줄었다 하는 연출
+
+사용자가 "의미하는 바"를 물어본 것은 - 이게 실제 큐 시스템과 어떤 관련이 있는지, 아니면 단순한 시각 효과인지 궁금한 것 같다.Spring 파라미터의 실제 의미
+이것은 순수 시각 효과입니다! 실제 큐 동작과는 무관합니다.
+
+코드 동작
+javascriptfunction getTunnelLength() {
+    // 기본 터널 길이 (큐 크기로 결정됨)
+    const baseLength = dynamicTunnelLength; 
+    
+    // ✨ 시각 효과: 사인파로 진동 추가
+    const oscillation = Math.sin(time * springFreq * Math.PI * 2) * springAmp;
+    
+    return baseLength * (1 + oscillation);
+}
+```
+
+---
+
+### 실제 의미
+
+**Spring Frequency (진동 속도)**
+```
+터널이 "숨쉬듯" 팽창/수축하는 속도
+
+1.9Hz = 1초에 1.9번 늘었다 줄었다
+        ~~~~ ~~~~ (빠른 호흡)
+```
+
+**Spring Amplitude (진동 크기)**
+```
+얼마나 크게 호흡하는지
+
+0.3 = 기본 길이의 ±30% 변화
+      |====| → |======| → |====|
+      짧음      길어짐      다시 짧음
+```
+
+---
+
+## 왜 이런 효과를 넣었나?
+
+### 1. 시각적 생동감
+```
+진동 없음: ========  (정적, 지루함)
+진동 있음: ~~~====~~~ (살아있는 느낌)
+```
+
+### 2. 실시간 시스템 표현
+```
+APM 차트는 "살아있는 시스템"을 보여줌
+→ 호흡하는 듯한 진동으로 "지금 동작 중"임을 표현
+```
+
+### 3. 데이터 밀도 강조
+```
+큐가 쌓이면:
+- 터널 기본 길이 증가 (실제 데이터)
+- 진동도 더 크게 보임 (시각적 강조)
+
+정리
+요소실제 동작시각 효과큐 크기✅ 터널 기본 길이 결정-Spring Freq-✨ 호흡 속도Spring Amp-✨ 호흡 크기
+결론: Spring 파라미터는 장식이고, 실제 큐 동작은 dynamicTunnelLength가 결정합니다.
+javascript// 실제 중요한 것
+dynamicTunnelLength = f(큐 크기)
+
+// 시각 효과
+최종 터널 길이 = dynamicTunnelLength × (1 ± 진동)
+진동을 끄고 싶다면 Spring Amplitude: 0으로 설정하면 됩니다!
+
 ---
 
 *Last Updated: 2024.11.13*  
