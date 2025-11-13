@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Interactive Particle Tunnel - Queue Model</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0a0a15;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+        }
+        .control-item {
+            margin: 8px 0;
+        }
+        label {
+            display: inline-block;
+            width: 180px;
+            font-size: 13px;
+        }
+        input[type="range"] {
+            width: 150px;
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 12px;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border: 1px solid rgba(100, 150, 255, 0.5);
+            min-width: 200px;
+        }
+        .tooltip.visible {
+            opacity: 1;
+        }
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        .tooltip-label {
+            color: #aaa;
+            margin-right: 10px;
+        }
+        .tooltip-value {
+            color: #6af;
+            font-weight: 500;
+        }
+        .stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 250px;
+            backdrop-filter: blur(10px);
+        }
+        .stats-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #6af;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .stats-label {
+            color: #aaa;
+        }
+        .stats-value {
+            color: #fff;
+            font-weight: 500;
+        }
+        .stats-value.highlight {
+            color: #ff6;
+        }
+        .selection-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+        .fix-notice {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(100, 255, 100, 0.8);
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid rgba(100, 255, 100, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-row">
+            <span class="tooltip-label">Transaction ID:</span>
+            <span class="tooltip-value" id="tooltipId">-</span>
+        </div>
+        <div class="tooltip-row">
+            <span class="tooltip-label">Response Time:</span>
+            <span class="tooltip-value" id="tooltipTime">-</span>
+        </div>
+        <div class="tooltip-row">
+            <span class="tooltip-label">Status:</span>
+            <span class="tooltip-value" id="tooltipStatus">-</span>
+        </div>
+        <div class="tooltip-row">
+            <span class="tooltip-label">Position:</span>
+            <span class="tooltip-value" id="tooltipPos">-</span>
+        </div>
+    </div>
+    
+    <div class="stats">
+        <div class="stats-title">📊 Queue Statistics</div>
+        <div class="stats-row">
+            <span class="stats-label">Active Particles:</span>
+            <span class="stats-value" id="statsActive">0</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Selected:</span>
+            <span class="stats-value" id="statsSelected">0</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">🔥 Queue Depth:</span>
+            <span class="stats-value highlight" id="statsInTunnel">0</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Avg Response:</span>
+            <span class="stats-value" id="statsAvgTime">0ms</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Error Rate:</span>
+            <span class="stats-value" id="statsErrorRate">0%</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Tunnel Length:</span>
+            <span class="stats-value" id="statsTunnelLength">0%</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="control-item">
+            <label>Particles Per Burst:</label>
+            <input type="range" id="burstSize" min="0" max="500" value="300" step="10">
+            <span id="burstSizeValue">300</span>
+        </div>
+        <div class="control-item">
+            <label>Burst Interval (ms):</label>
+            <input type="range" id="burstInterval" min="50" max="1500" value="300" step="50">
+            <span id="burstIntervalValue">300</span>
+        </div>
+        <div class="control-item">
+            <label>Spring Frequency:</label>
+            <input type="range" id="springFreq" min="0.2" max="2.0" value="0.8" step="0.1">
+            <span id="springFreqValue">0.8</span>
+        </div>
+        <div class="control-item">
+            <label>Spring Amplitude:</label>
+            <input type="range" id="springAmp" min="0.0" max="1.0" value="0.4" step="0.05">
+            <span id="springAmpValue">0.4</span>
+        </div>
+    </div>
+    
+    <div class="fix-notice">
+        ✅ Fixed: Tunnel length now based on absolute queue depth (not ratio)
+    </div>
+    
+    <div class="selection-hint">
+        💡 Drag to select particles | Hover for details | Click to clear selection
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+
+        let width, height;
+        let particles = [];
+        let burstSize = 300;
+        let burstInterval = 300;
+        let lastBurstTime = 0;
+        let springFreq = 0.8;
+        let springAmp = 0.4;
+        let streamWidth = 0.03;
+        let tunnelBaseLength = 0.1;
+        let time = 0;
+        let dynamicTunnelLength = 0.2;
+        let transactionIdCounter = 1;
+
+        const tunnelEntranceX = 0.3;
+        const centerY = 0.5;
+
+        // ✅ 터널 최대 용량 정의 (절대량 기준)
+        const REFERENCE_QUEUE_SIZE = 300;
+
+        // 인터랙션 상태
+        let hoveredParticle = null;
+        let mouseX = 0;
+        let mouseY = 0;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let selectionRect = null;
+        let selectedParticles = new Set();
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function getTunnelLength() {
+            return dynamicTunnelLength * (1 + Math.sin(time * springFreq * Math.PI * 2) * springAmp);
+        }
+
+        function updateTunnelLength() {
+            // 1. 현재 터널(큐)에 쌓인 데이터 측정
+            let particlesInTunnel = 0;
+            for (let particle of particles) {
+                if (particle.active && particle.isInTunnel()) {
+                    particlesInTunnel++;
+                }
+            }
+
+            const minLength = tunnelBaseLength * 0.5;
+            const maxLength = tunnelBaseLength * 1.5;
+            
+            // ✅ 절대 적재량으로 터널 길이 결정
+            // burstSize와 무관하게 실제 쌓인 양으로만 판단
+            const queueFillRatio = Math.min(particlesInTunnel / REFERENCE_QUEUE_SIZE, 1.0);
+            const targetLength = minLength + queueFillRatio * (maxLength - minLength);
+
+            // 2. 부드러운 전환 (스무딩)
+            dynamicTunnelLength += (targetLength - dynamicTunnelLength) * 0.05;
+        }
+
+        class Particle {
+            constructor() {
+                this.active = false;
+                this.id = 0;
+                this.responseTime = 0;
+                this.isError = false;
+                this.x = -0.05;
+                this.y = centerY;
+                this.vx = 0;
+                this.vy = 0;
+                this.size = 2;
+                this.alpha = 0.7;
+            }
+
+            activate() {
+                this.active = true;
+                this.id = transactionIdCounter++;
+                this.responseTime = Math.floor(50 + Math.random() * 500);
+                this.isError = Math.random() < 0.15;
+                this.x = -0.05;
+                this.y = centerY + (Math.random() - 0.5) * streamWidth;
+                this.vx = 0.4 + Math.random() * 0.2;
+                this.vy = (Math.random() - 0.5) * 0.02;
+                this.size = 2 + Math.random() * 2;
+                this.alpha = 0.7 + Math.random() * 0.3;
+            }
+
+            update(dt) {
+                if (!this.active) return;
+
+                const tunnelLength = getTunnelLength();
+                const tunnelExitX = tunnelEntranceX + tunnelLength;
+                const collisionZone = tunnelEntranceX - 0.05;
+
+                if (this.x < collisionZone && this.x > collisionZone - 0.15) {
+                    const dyToCenter = centerY - this.y;
+                    this.vy += dyToCenter * 0.12;
+                }
+
+                if (this.x >= collisionZone - 0.02 && this.x < collisionZone + 0.02) {
+                    this.vx *= 0.85;
+                    const explosionForce = 0.15;
+                    this.vy += (Math.random() - 0.5) * explosionForce;
+                    
+                    const distFromCenter = Math.abs(this.y - centerY);
+                    if (distFromCenter > streamWidth * 0.8) {
+                        this.y = centerY + Math.sign(this.y - centerY) * streamWidth * 0.8;
+                        this.vy *= -0.3;
+                    }
+                }
+
+                if (this.x >= collisionZone && this.x < tunnelEntranceX) {
+                    this.vx *= 1.02;
+                    const dyToCenter = centerY - this.y;
+                    this.vy += dyToCenter * 0.15;
+                }
+
+                if (this.x >= tunnelExitX - 0.02 && this.x < tunnelExitX + 0.02) {
+                    const distFromCenter = Math.abs(this.y - centerY);
+                    if (distFromCenter > streamWidth * 0.5) {
+                        this.y = centerY + Math.sign(this.y - centerY) * streamWidth * 0.5;
+                    }
+                    this.vx *= 1.3;
+                    this.vy *= 0.3;
+                }
+
+                this.vx *= 0.998;
+                this.vy *= 0.98;
+
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+
+                if (this.x > 1.2 || this.y < -0.1 || this.y > 1.1) {
+                    this.active = false;
+                }
+            }
+
+            isInTunnel() {
+                const tunnelLength = getTunnelLength();
+                const tunnelExitX = tunnelEntranceX + tunnelLength;
+                return this.x >= tunnelEntranceX && this.x <= tunnelExitX;
+            }
+
+            isInSelection(rect) {
+                const screenX = this.x * width;
+                const screenY = this.y * height;
+                return screenX >= rect.x && screenX <= rect.x + rect.w &&
+                       screenY >= rect.y && screenY <= rect.y + rect.h;
+            }
+
+            distanceToMouse(mx, my) {
+                const screenX = this.x * width;
+                const screenY = this.y * height;
+                const dx = screenX - mx;
+                const dy = screenY - my;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            draw() {
+                if (!this.active || this.isInTunnel()) return;
+
+                const screenX = this.x * width;
+                const screenY = this.y * height;
+                
+                const isSelected = selectedParticles.has(this);
+                const isHovered = hoveredParticle === this;
+                
+                let rectWidth = this.size * 3;
+                let rectHeight = this.size * 1.5;
+                
+                if (isSelected || isHovered) {
+                    rectWidth *= 1.5;
+                    rectHeight *= 1.5;
+                }
+                
+                let color = this.isError ? '255, 100, 100' : '100, 150, 255';
+                
+                if (isSelected) {
+                    ctx.strokeStyle = 'rgba(255, 255, 100, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(
+                        screenX - rectWidth / 2 - 2, 
+                        screenY - rectHeight / 2 - 2, 
+                        rectWidth + 4, 
+                        rectHeight + 4
+                    );
+                }
+                
+                const gradient = ctx.createLinearGradient(
+                    screenX - rectWidth / 2, screenY, 
+                    screenX + rectWidth / 2, screenY
+                );
+                gradient.addColorStop(0, 'rgba(' + color + ', 0)');
+                gradient.addColorStop(0.5, 'rgba(' + color + ', ' + this.alpha + ')');
+                gradient.addColorStop(1, 'rgba(' + color + ', 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(
+                    screenX - rectWidth / 2, 
+                    screenY - rectHeight / 2, 
+                    rectWidth, 
+                    rectHeight
+                );
+
+                if (isHovered) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawTunnel() {
+            const tunnelLength = getTunnelLength();
+            const entranceX = tunnelEntranceX * width;
+            const exitX = (tunnelEntranceX + tunnelLength) * width;
+            const cy = centerY * height;
+            const baseRadius = streamWidth * height * 0.6;
+
+            const numRings = Math.floor((exitX - entranceX) / 8);
+            
+            for (let i = 0; i <= numRings; i++) {
+                const t = i / numRings;
+                const x = entranceX + (exitX - entranceX) * t;
+                
+                const radiusMultiplier = 1 + Math.sin(t * Math.PI) * 0.2;
+                const radius = baseRadius * radiusMultiplier;
+                
+                const alpha = 0.3 + Math.sin(t * Math.PI) * 0.4;
+                
+                ctx.fillStyle = 'rgba(100, 150, 255, ' + alpha + ')';
+                ctx.strokeStyle = 'rgba(70, 120, 220, ' + (alpha * 0.5) + ')';
+                ctx.lineWidth = 1;
+                
+                ctx.beginPath();
+                ctx.arc(x, cy, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+
+        function drawSelectionRect() {
+            if (!selectionRect) return;
+
+            ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
+            ctx.fillStyle = 'rgba(100, 200, 255, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            
+            ctx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+            ctx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+            
+            ctx.setLineDash([]);
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < 3000; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function fireBurst(now) {
+            let activated = 0;
+            for (let particle of particles) {
+                if (!particle.active && activated < burstSize) {
+                    particle.activate();
+                    activated++;
+                }
+            }
+        }
+
+        function findNearestParticle(mx, my) {
+            let nearest = null;
+            let minDist = 20;
+            
+            for (let particle of particles) {
+                if (!particle.active || particle.isInTunnel()) continue;
+                
+                const dist = particle.distanceToMouse(mx, my);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = particle;
+                }
+            }
+            
+            return nearest;
+        }
+
+        function updateTooltip() {
+            if (hoveredParticle) {
+                tooltip.classList.add('visible');
+                document.getElementById('tooltipId').textContent = '#' + hoveredParticle.id;
+                document.getElementById('tooltipTime').textContent = hoveredParticle.responseTime + 'ms';
+                document.getElementById('tooltipStatus').textContent = hoveredParticle.isError ? '❌ Error' : '✅ Success';
+                document.getElementById('tooltipPos').textContent = 
+                    'x: ' + (hoveredParticle.x * 100).toFixed(1) + '%, y: ' + (hoveredParticle.y * 100).toFixed(1) + '%';
+                
+                tooltip.style.left = (mouseX + 15) + 'px';
+                tooltip.style.top = (mouseY + 15) + 'px';
+            } else {
+                tooltip.classList.remove('visible');
+            }
+        }
+
+        function updateStats() {
+            let activeCount = 0;
+            let inTunnelCount = 0;
+            let errorCount = 0;
+            let totalResponseTime = 0;
+
+            for (let particle of particles) {
+                if (particle.active) {
+                    activeCount++;
+                    totalResponseTime += particle.responseTime;
+                    if (particle.isError) errorCount++;
+                    if (particle.isInTunnel()) inTunnelCount++;
+                }
+            }
+
+            document.getElementById('statsActive').textContent = activeCount;
+            document.getElementById('statsSelected').textContent = selectedParticles.size;
+            document.getElementById('statsInTunnel').textContent = inTunnelCount;
+            document.getElementById('statsAvgTime').textContent = 
+                activeCount > 0 ? Math.round(totalResponseTime / activeCount) + 'ms' : '0ms';
+            document.getElementById('statsErrorRate').textContent = 
+                activeCount > 0 ? ((errorCount / activeCount) * 100).toFixed(1) + '%' : '0%';
+            
+            // ✅ 터널 길이 비율 표시 추가
+            const tunnelLengthRatio = ((dynamicTunnelLength - tunnelBaseLength * 0.5) / (tunnelBaseLength * 0.5)) * 100;
+            document.getElementById('statsTunnelLength').textContent = Math.max(0, tunnelLengthRatio).toFixed(0) + '%';
+        }
+
+        let lastTime = Date.now();
+
+        function animate() {
+            const now = Date.now();
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            time += dt;
+
+            if (now - lastBurstTime >= burstInterval) {
+                fireBurst(now);
+                lastBurstTime = now;
+            }
+
+            ctx.fillStyle = 'rgba(10, 10, 21, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            updateTunnelLength();
+
+            for (let particle of particles) {
+                particle.update(dt);
+            }
+
+            drawTunnel();
+
+            for (let particle of particles) {
+                particle.draw();
+            }
+
+            drawSelectionRect();
+            updateTooltip();
+            updateStats();
+
+            requestAnimationFrame(animate);
+        }
+
+        // 마우스 이벤트
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            if (isDragging) {
+                const x = Math.min(dragStartX, mouseX);
+                const y = Math.min(dragStartY, mouseY);
+                const w = Math.abs(mouseX - dragStartX);
+                const h = Math.abs(mouseY - dragStartY);
+                selectionRect = { x, y, w, h };
+            } else {
+                hoveredParticle = findNearestParticle(mouseX, mouseY);
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            isDragging = true;
+            selectedParticles.clear();
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (isDragging && selectionRect) {
+                for (let particle of particles) {
+                    if (particle.active && !particle.isInTunnel() && particle.isInSelection(selectionRect)) {
+                        selectedParticles.add(particle);
+                    }
+                }
+            }
+            isDragging = false;
+            selectionRect = null;
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (!isDragging && selectedParticles.size > 0) {
+                selectedParticles.clear();
+            }
+        });
+
+        // 컨트롤
+        document.getElementById('burstSize').addEventListener('input', function(e) {
+            burstSize = parseInt(e.target.value);
+            document.getElementById('burstSizeValue').textContent = burstSize;
+        });
+
+        document.getElementById('burstInterval').addEventListener('input', function(e) {
+            burstInterval = parseInt(e.target.value);
+            document.getElementById('burstIntervalValue').textContent = burstInterval;
+        });
+
+        document.getElementById('springFreq').addEventListener('input', function(e) {
+            springFreq = parseFloat(e.target.value);
+            document.getElementById('springFreqValue').textContent = springFreq.toFixed(1);
+        });
+
+        document.getElementById('springAmp').addEventListener('input', function(e) {
+            springAmp = parseFloat(e.target.value);
+            document.getElementById('springAmpValue').textContent = springAmp.toFixed(2);
+        });
+
+        window.addEventListener('resize', resize);
+
+        resize();
+        initParticles();
+        animate();
+    </script>
+</body>
+</html>
