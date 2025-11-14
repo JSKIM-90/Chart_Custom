@@ -234,8 +234,9 @@
         let dynamicTunnelLength = 0.15;
         let transactionIdCounter = 1;
 
-        const tunnelEntranceX = 0.3;
+        const tunnelEntranceX = 0.65; // 이제는 터널 출구 (오른쪽)
         const centerY = 0.5;
+        const diskGap = 0.02; // 원반과 터널 사이 간격 (정규화 좌표)
 
         // 인터랙션 상태
         let hoveredParticle = null;
@@ -317,16 +318,21 @@
         }
 
         function updateTunnelLength() {
-            const minLength = tunnelBaseLength * 0.5;
-            const maxLength = tunnelBaseLength * 2.5;
-            
-            // ✅ 큐 크기에 비례해서 터널 길이 결정
             const queueSize = tunnelQueue.getQueueSize();
+
+            // ✅ 큐가 비어있으면 터널 사라짐
+            if (queueSize === 0) {
+                dynamicTunnelLength += (0 - dynamicTunnelLength) * 0.08;
+                return;
+            }
+
+            // ✅ 큐 크기에 비례해서 터널 길이 결정 (0부터 시작)
+            const maxLength = tunnelBaseLength * 2.5;
             const maxQueueDisplay = 300; // 300개까지 표현
             const queueRatio = Math.min(queueSize / maxQueueDisplay, 1.0);
-            
-            const targetLength = minLength + queueRatio * (maxLength - minLength);
-            
+
+            const targetLength = queueRatio * maxLength;
+
             // 부드러운 전환
             dynamicTunnelLength += (targetLength - dynamicTunnelLength) * 0.08;
         }
@@ -358,12 +364,14 @@
                 this.id = transactionIdCounter++;
                 this.responseTime = Math.floor(50 + Math.random() * 500);
                 this.isError = Math.random() < 0.15;
+
+                // 왼쪽 화면 밖에서 시작
                 this.x = -0.05;
-                this.y = centerY + (Math.random() - 0.5) * streamWidth;
+                this.y = centerY + (Math.random() - 0.5) * 0.15; // 더 넓게 분포
                 this.vx = 0.5 + Math.random() * 0.2;
                 this.vy = (Math.random() - 0.5) * 0.02;
-                this.size = 2 + Math.random() * 2;
-                this.alpha = 0.7 + Math.random() * 0.3;
+                this.size = 3 + Math.random() * 3; // 더 크게
+                this.alpha = 0.95; // 더 선명하게
             }
             
             enterQueue(now) {
@@ -375,9 +383,8 @@
             
             exitQueue(now) {
                 this.inQueue = false;
-                // 터널 출구에서 배출
-                const tunnelLength = getTunnelLength();
-                this.x = tunnelEntranceX + tunnelLength;
+                // 출구 원반에서 배출
+                this.x = tunnelEntranceX + diskGap;
                 this.vx = 0.6 + Math.random() * 0.3;
                 this.vy = (Math.random() - 0.5) * 0.05;
             }
@@ -389,13 +396,14 @@
                     // 큐에 있으면 터널 안에서 대기
                     const tunnelLength = getTunnelLength();
                     const queueSize = tunnelQueue.getQueueSize();
-                    
+
                     // 큐 위치에 따라 터널 내부 위치 결정
                     const queueIndex = tunnelQueue.queue.findIndex(item => item.particle === this);
                     if (queueIndex !== -1) {
                         const positionRatio = queueIndex / Math.max(queueSize, 1);
-                        this.x = tunnelEntranceX + tunnelLength * positionRatio;
-                        
+                        // 왼쪽 입구부터 오른쪽 출구로 (반대 방향)
+                        this.x = tunnelEntranceX - tunnelLength * (1 - positionRatio);
+
                         // 약간의 떨림 효과
                         this.y = centerY + Math.sin(now * 0.003 + queueIndex) * 0.005;
                     }
@@ -403,17 +411,23 @@
                 }
 
                 // 큐에 없으면 자유롭게 이동
-                
-                // 터널 입구 접근
-                const collisionZone = tunnelEntranceX - 0.05;
-                
-                if (this.x < collisionZone && this.x > collisionZone - 0.15) {
+
+                const tunnelLength = getTunnelLength();
+                const tunnelEntrance = tunnelEntranceX - tunnelLength;
+                const entranceDisk = tunnelEntrance - diskGap; // 입구 원반 위치
+
+                // 입구 원반으로 수렴하는 효과 (한 점으로 모이기)
+                const distanceToDisk = entranceDisk - this.x;
+
+                // 원반에 가까워질수록 강하게 끌어당김
+                if (distanceToDisk > 0 && distanceToDisk < 0.35) {
                     const dyToCenter = centerY - this.y;
-                    this.vy += dyToCenter * 0.12;
+                    const strength = 1.0 - (distanceToDisk / 0.35); // 0~1 (가까울수록 강함)
+                    this.vy += dyToCenter * strength * 0.3; // 강한 수렴력
                 }
-                
+
                 // 터널 입구 도달 → 큐에 삽입
-                if (this.x >= tunnelEntranceX - 0.01 && !this.inQueue && this.x < tunnelEntranceX + 0.02) {
+                if (this.x >= tunnelEntrance - 0.01 && !this.inQueue && this.x < tunnelEntrance + 0.05) {
                     tunnelQueue.enqueue(this, now);
                     return;
                 }
@@ -443,40 +457,40 @@
 
                 const screenX = this.x * width;
                 const screenY = this.y * height;
-                
+
                 const isHovered = hoveredParticle === this;
-                
-                let rectWidth = this.size * 3;
-                let rectHeight = this.size * 1.5;
-                
+
+                // 가로로 긴 직사각형
+                let rectWidth = this.size * 5; // 더 길게
+                let rectHeight = this.size * 1.2; // 더 얇게
+
                 if (isHovered) {
                     rectWidth *= 1.5;
                     rectHeight *= 1.5;
                 }
-                
-                // 큐에 있으면 노란색, 에러면 빨간색, 정상이면 파란색
+
+                // 에러면 빨간색, 정상이면 파란색
                 let color;
-                if (this.inQueue) {
-                    color = '255, 220, 100'; // 노란색 (대기 중)
-                } else if (this.isError) {
+                if (this.isError) {
                     color = '255, 100, 100'; // 빨간색
                 } else {
                     color = '100, 150, 255'; // 파란색
                 }
-                
+
+                // 선명한 그라데이션 (중심부가 더 불투명)
                 const gradient = ctx.createLinearGradient(
-                    screenX - rectWidth / 2, screenY, 
+                    screenX - rectWidth / 2, screenY,
                     screenX + rectWidth / 2, screenY
                 );
-                gradient.addColorStop(0, 'rgba(' + color + ', 0)');
+                gradient.addColorStop(0, 'rgba(' + color + ', 0.2)'); // 양 끝 덜 투명
                 gradient.addColorStop(0.5, 'rgba(' + color + ', ' + this.alpha + ')');
-                gradient.addColorStop(1, 'rgba(' + color + ', 0)');
-                
+                gradient.addColorStop(1, 'rgba(' + color + ', 0.2)');
+
                 ctx.fillStyle = gradient;
                 ctx.fillRect(
-                    screenX - rectWidth / 2, 
-                    screenY - rectHeight / 2, 
-                    rectWidth, 
+                    screenX - rectWidth / 2,
+                    screenY - rectHeight / 2,
+                    rectWidth,
                     rectHeight
                 );
 
@@ -492,31 +506,73 @@
 
         function drawTunnel() {
             const tunnelLength = getTunnelLength();
-            const entranceX = tunnelEntranceX * width;
-            const exitX = (tunnelEntranceX + tunnelLength) * width;
             const cy = centerY * height;
             const baseRadius = streamWidth * height * 0.6;
+            const diskRadius = baseRadius * 1.5; // 원반 크기
 
-            const numRings = Math.max(Math.floor((exitX - entranceX) / 8), 3);
-            
+            // 터널 위치 (원반보다 안쪽)
+            const tunnelExitX = tunnelEntranceX * width;
+            const tunnelEntranceX_screen = (tunnelEntranceX - tunnelLength) * width;
+
+            // 원반 위치 (터널보다 바깥쪽)
+            const exitDiskX = (tunnelEntranceX + diskGap) * width;
+            const entranceDiskX = (tunnelEntranceX - tunnelLength - diskGap) * width;
+
+            // 터널 링 그리기 (적절한 간격)
+            const ringSpacing = 13; // 픽셀 단위 간격 (40 / 3 ≈ 13)
+            const tunnelLengthPx = tunnelExitX - tunnelEntranceX_screen;
+            const numRings = Math.max(Math.floor(tunnelLengthPx / ringSpacing), 2);
+
             for (let i = 0; i <= numRings; i++) {
                 const t = i / numRings;
-                const x = entranceX + (exitX - entranceX) * t;
-                
-                const radiusMultiplier = 1 + Math.sin(t * Math.PI) * 0.2;
-                const radius = baseRadius * radiusMultiplier;
-                
-                const alpha = 0.3 + Math.sin(t * Math.PI) * 0.4;
-                
+                const x = tunnelEntranceX_screen + (tunnelExitX - tunnelEntranceX_screen) * t;
+
+                // 일정한 반지름 (기둥 모양)
+                const radius = baseRadius;
+
+                // 균일한 투명도
+                const alpha = 0.6;
+
                 ctx.fillStyle = 'rgba(100, 150, 255, ' + alpha + ')';
-                ctx.strokeStyle = 'rgba(70, 120, 220, ' + (alpha * 0.5) + ')';
-                ctx.lineWidth = 1;
-                
+                ctx.strokeStyle = 'rgba(70, 120, 220, 0.8)';
+                ctx.lineWidth = 2;
+
                 ctx.beginPath();
-                ctx.arc(x, cy, radius, 0, Math.PI * 2);
+                // 타원으로 그리기 (옆에서 본 원반 느낌)
+                // ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle)
+                ctx.ellipse(x, cy, 3, radius, 0, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
+
+            // 입구 원반 (왼쪽, 터널보다 바깥쪽) - 옆에서 본 모양
+            if (tunnelLength > 0.01) {
+                // 타원형 그라데이션을 위한 수동 렌더링
+                ctx.fillStyle = 'rgba(100, 150, 255, 0.7)';
+                ctx.beginPath();
+                ctx.ellipse(entranceDiskX, cy, 5, diskRadius, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 원반 테두리
+                ctx.strokeStyle = 'rgba(70, 120, 220, 0.9)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.ellipse(entranceDiskX, cy, 5, diskRadius, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // 출구 원반 (오른쪽, 터널보다 바깥쪽) - 옆에서 본 모양
+            ctx.fillStyle = 'rgba(100, 150, 255, 0.7)';
+            ctx.beginPath();
+            ctx.ellipse(exitDiskX, cy, 5, diskRadius, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 원반 테두리
+            ctx.strokeStyle = 'rgba(70, 120, 220, 0.9)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.ellipse(exitDiskX, cy, 5, diskRadius, 0, 0, Math.PI * 2);
+            ctx.stroke();
         }
 
         function initParticles() {
